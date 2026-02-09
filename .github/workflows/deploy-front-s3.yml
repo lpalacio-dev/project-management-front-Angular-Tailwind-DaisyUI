@@ -1,0 +1,48 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - develop
+      - prod
+  workflow_dispatch: # Permite ejecución manual desde la web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    # Definimos variables dinámicas según la rama (como hacías en GitLab)
+    env:
+      S3_BUCKET: gestion-proyectos-front
+      #DISTRIBUTION_ID: ${{ github.ref_name == 'prod' && 'E25FDD0DIUFGUH' || '*****' }}
+      DEPLOY_AMBIENTE: ${{ github.ref_name == 'prod' && 'build' || 'build' }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Build
+        run: npm run ${{ env.DEPLOY_AMBIENTE }}
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Deploy a S3 e Invalidation
+        # El if asegura que 'prod' solo se ejecute manualmente si así lo deseas, 
+        # o puedes quitarlo para que sea automático como en develop.
+        if: github.ref_name == 'develop' || (github.ref_name == 'prod' && github.event_name != 'push')
+        run: |
+          aws s3 sync dist/project-management-front/ s3://${{ env.S3_BUCKET }}/ --delete
