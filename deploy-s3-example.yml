@@ -1,0 +1,271 @@
+name: Deploy to AWS S3 + CloudFront
+
+on:
+  push:
+    branches:
+      - main        # Producción
+      - develop     # Desarrollo
+      - staging     # Staging (opcional)
+  workflow_dispatch:  # Permite deployment manual
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+# Variables globales
+env:
+  NODE_VERSION: '20'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  # ============================================================================
+  # JOB 1: INSTALL DEPENDENCIES
+  # ============================================================================
+  install:
+    name: Install Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+  # ============================================================================
+  # JOB 2: BUILD
+  # ============================================================================
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: install
+    strategy:
+      matrix:
+        include:
+          - branch: develop
+            environment: development
+            build_command: build:dev
+          - branch: staging
+            environment: staging
+            build_command: build:staging
+          - branch: main
+            environment: production
+            build_command: build:prod
+    # Solo ejecutar para el branch correspondiente
+    if: |
+      (github.ref == 'refs/heads/develop' && matrix.branch == 'develop') ||
+      (github.ref == 'refs/heads/staging' && matrix.branch == 'staging') ||
+      (github.ref == 'refs/heads/main' && matrix.branch == 'main')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Configure environment variables
+        run: |
+          echo "Configurando variables para ${{ matrix.environment }}"
+          chmod +x scripts/replace-env.sh
+        
+      - name: Set API_URL for development
+        if: matrix.environment == 'development'
+        run: |
+          echo "API_URL=${{ secrets.DEV_API_URL }}" >> $GITHUB_ENV
+          
+      - name: Set API_URL for staging
+        if: matrix.environment == 'staging'
+        run: |
+          echo "API_URL=${{ secrets.STAGING_API_URL }}" >> $GITHUB_ENV
+          
+      - name: Set API_URL for production
+        if: matrix.environment == 'production'
+        run: |
+          echo "API_URL=${{ secrets.PROD_API_URL }}" >> $GITHUB_ENV
+
+      - name: Replace environment variables
+        run: ./scripts/replace-env.sh
+
+      - name: Build application
+        run: npm run ${{ matrix.build_command }}
+
+      - name: List build output
+        run: |
+          echo "Build artifacts:"
+          ls -la dist/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.environment }}
+          path: dist/gestion-proyectos-frontend/browser
+          retention-days: 1
+
+  # ============================================================================
+  # JOB 3: DEPLOY TO S3 + CLOUDFRONT
+  # ============================================================================
+  deploy:
+    name: Deploy to S3 + CloudFront
+    runs-on: ubuntu-latest
+    needs: build
+    # Deploy automático a dev, manual a staging/prod
+    if: |
+      github.ref == 'refs/heads/develop' ||
+      (github.ref == 'refs/heads/staging' && github.event_name == 'workflow_dispatch') ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch')
+    
+    strategy:
+      matrix:
+        include:
+          - branch: develop
+            environment: development
+            s3_bucket: gestion-proyectos-dev
+            cloudfront_id: E1234567890ABC  # Reemplazar con tu ID
+            auto_deploy: true
+          - branch: staging
+            environment: staging
+            s3_bucket: gestion-proyectos-staging
+            cloudfront_id: E0987654321XYZ  # Reemplazar con tu ID
+            auto_deploy: false
+          - branch: main
+            environment: production
+            s3_bucket: gestion-proyectos-prod
+            cloudfront_id: E5555555555555  # Reemplazar con tu ID
+            auto_deploy: false
+    
+    # Solo ejecutar para el branch correspondiente
+    if: |
+      (github.ref == 'refs/heads/develop' && matrix.branch == 'develop') ||
+      (github.ref == 'refs/heads/staging' && matrix.branch == 'staging') ||
+      (github.ref == 'refs/heads/main' && matrix.branch == 'main')
+    
+    environment:
+      name: ${{ matrix.environment }}
+      url: https://${{ matrix.s3_bucket }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.environment }}
+          path: dist/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: List files to deploy
+        run: |
+          echo "Files to deploy:"
+          ls -lah dist/
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync dist/ s3://${{ matrix.s3_bucket }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "*.html"
+          
+          # HTML files sin cache
+          aws s3 sync dist/ s3://${{ matrix.s3_bucket }}/ \
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ matrix.cloudfront_id }} \
+            --paths "/*"
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Environment: ${{ matrix.environment }}"
+          echo "S3 Bucket: s3://${{ matrix.s3_bucket }}"
+          echo "CloudFront ID: ${{ matrix.cloudfront_id }}"
+          echo "URL: https://${{ matrix.s3_bucket }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+
+  # ============================================================================
+  # JOB 4: HEALTH CHECK (OPCIONAL)
+  # ============================================================================
+  health_check:
+    name: Post-Deployment Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    
+    steps:
+      - name: Wait for deployment propagation
+        run: sleep 30
+
+      - name: Health check for development
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          curl -f -s -o /dev/null -w "%{http_code}" \
+            https://gestion-proyectos-dev.s3-website-us-east-1.amazonaws.com || exit 1
+
+      - name: Health check for production
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -f -s -o /dev/null -w "%{http_code}" \
+            https://gestion-proyectos-prod.s3-website-us-east-1.amazonaws.com || exit 1
+
+      - name: Health check passed
+        run: echo "✅ Health check passed!"
+
+  # ============================================================================
+  # JOB 5: NOTIFY (OPCIONAL)
+  # ============================================================================
+  notify:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy, health_check]
+    if: always()
+    
+    steps:
+      - name: Notify success
+        if: needs.deploy.result == 'success' && needs.health_check.result == 'success'
+        run: |
+          echo "✅ Deployment successful and health check passed"
+          # Aquí puedes agregar notificaciones a Slack, Discord, etc.
+
+      - name: Notify failure
+        if: needs.deploy.result == 'failure' || needs.health_check.result == 'failure'
+        run: |
+          echo "❌ Deployment or health check failed"
+          # Aquí puedes agregar notificaciones de error
