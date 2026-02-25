@@ -14,7 +14,7 @@ jobs:
     # Definimos variables dinámicas según la rama (como hacías en GitLab)
     env:
       S3_BUCKET: gestion-proyectos-front
-      #DISTRIBUTION_ID: ${{ github.ref_name == 'prod' && 'E25FDD0DIUFGUH' || '*****' }}
+      DISTRIBUTION_ID: E2VNLYAE99DGIU
       DEPLOY_AMBIENTE: ${{ github.ref_name == 'prod' && 'build' || 'build' }}
 
     steps:
@@ -43,7 +43,7 @@ jobs:
       - name: Deploy a S3 e Invalidation
         # El if asegura que 'prod' solo se ejecute manualmente si así lo deseas, 
         # o puedes quitarlo para que sea automático como en develop.
-        # aws cloudfront create-invalidation --distribution-id ${{ env.DISTRIBUTION_ID }} --paths "/*"
         if: github.ref_name == 'develop' || (github.ref_name == 'prod' && github.event_name != 'push')
         run: |
           aws s3 sync dist/project-management-front/browser/ s3://${{ env.S3_BUCKET }}/ --delete
+          aws cloudfront create-invalidation --distribution-id ${{ env.DISTRIBUTION_ID }} --paths "/*"
