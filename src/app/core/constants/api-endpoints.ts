@@ -1,10 +1,11 @@
 // src/app/core/constants/api-endpoints.ts
+import { environment } from "../../../environments/environment";
 
 /**
  * Base URL de la API
  * En producción esto debe venir de environment
  */
-export const API_BASE_URL = 'https://localhost:32773'; // Ajusta según tu backend
+export const API_BASE_URL = environment.API_BASE_URL; // Ajusta según tu backend
 
 /**
  * Endpoints de la API organizados por dominio
