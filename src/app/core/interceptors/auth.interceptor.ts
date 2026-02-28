@@ -2,7 +2,7 @@
 
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { AuthSignalsService } from '../signals/auth.signal.service';
+import { AuthSignalsService } from '../signals/auth-signals.service';
 
 /**
  * Interceptor de autenticación (Functional)

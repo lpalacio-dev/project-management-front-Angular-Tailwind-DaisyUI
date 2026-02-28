@@ -1,7 +1,7 @@
 // src/app/features/dashboard/pages/dashboard/dashboard.component.ts
 
 import { Component, inject } from '@angular/core';
-import { AuthSignalsService } from '../../core/signals/auth.signal.service';
+import { AuthSignalsService } from '../../core/signals/auth-signals.service';
 import { RouterLink } from '@angular/router';
 
 /**

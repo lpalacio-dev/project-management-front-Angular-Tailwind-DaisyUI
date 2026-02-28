@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToastContainerComponent } from './shared/components/toast-container/toast-container.component';
-import { AuthSignalsService } from './core/signals/auth.signal.service';
+import { AuthSignalsService } from './core/signals/auth-signals.service';
 import { LoadingService } from './core/services/loading.service';
 
 @Component({
