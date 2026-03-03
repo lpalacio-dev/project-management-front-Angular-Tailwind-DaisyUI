@@ -3,8 +3,8 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ProjectService } from '../services/project.service';
-import { NotificationService } from '../services/notification.service';
+import { ProjectService } from '@core/services/project.service';
+import { NotificationService } from '@core/services/notification.service';
 import { AuthSignalsService } from './auth-signals.service';
 import { 
   Project, 
@@ -12,7 +12,7 @@ import {
   UpdateProjectRequest, 
   ProjectFilters,
   ProjectStatus
-} from '../models/project.model';
+} from '@core/models/project.model';
 
 /**
  * Servicio de state management para proyectos usando Signals
@@ -201,20 +201,41 @@ export class ProjectSignalsService {
     this.error.set(null);
 
     try {
-      const updatedProject = await firstValueFrom(this.projectService.update(id, data));
+      // El backend retorna 204 No Content, así que el response será void
+      await firstValueFrom(this.projectService.update(id, data));
       
-      // Actualizar en la lista
-      this.updateProjectInList(updatedProject);
-      
-      // Actualizar el seleccionado si es el mismo
-      if (this.selectedProject()?.id === id) {
+      // Reconstruir el proyecto actualizado localmente
+      const currentProject = this.selectedProject();
+      if (currentProject && currentProject.id === id) {
+        // Actualizar el proyecto seleccionado con los nuevos datos
+        const updatedProject: Project = {
+          ...currentProject,
+          name: data.name,
+          description: data.description,
+          status: data.status
+        };
+        
         this.selectedProject.set(updatedProject);
+        this.updateProjectInList(updatedProject);
+      } else {
+        // Si no está en selectedProject, buscar en la lista
+        const projectFromList = this.projects().find(p => p.id === id);
+        if (projectFromList) {
+          const updatedProject: Project = {
+            ...projectFromList,
+            name: data.name,
+            description: data.description,
+            status: data.status
+          };
+          this.updateProjectInList(updatedProject);
+        }
       }
       
       this.notifications.success('Proyecto actualizado exitosamente');
     } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al actualizar proyecto';
+      const errorMessage = error?.error?.message || error?.error?.Message || 'Error al actualizar proyecto';
       this.error.set(errorMessage);
+      this.notifications.error(errorMessage);
       throw error;
     } finally {
       this.loading.set(false);

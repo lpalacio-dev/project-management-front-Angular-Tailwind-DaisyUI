@@ -3,8 +3,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_ENDPOINTS } from '../constants/api-endpoints';
-import { Project, CreateProjectRequest, UpdateProjectRequest } from '../models/project.model';
+import { API_ENDPOINTS } from '@core/constants/api-endpoints';
+import { Project, CreateProjectRequest, UpdateProjectRequest } from '@core/models/project.model';
 
 /**
  * Servicio HTTP para gestión de proyectos
@@ -45,11 +45,12 @@ export class ProjectService {
   /**
    * Actualiza un proyecto existente
    * Solo el Owner o Admin global pueden actualizar
+   * Backend retorna 204 No Content (no devuelve el objeto actualizado)
    * @param id ID del proyecto
    * @param data Datos actualizados
    */
-  update(id: string, data: UpdateProjectRequest): Observable<Project> {
-    return this.http.put<Project>(API_ENDPOINTS.PROJECTS.UPDATE(id), data);
+  update(id: string, data: UpdateProjectRequest): Observable<void> {
+    return this.http.put<void>(API_ENDPOINTS.PROJECTS.UPDATE(id), data);
   }
 
   /**

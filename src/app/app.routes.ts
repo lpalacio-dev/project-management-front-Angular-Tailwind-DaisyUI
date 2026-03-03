@@ -31,7 +31,13 @@ export const routes: Routes = [
       animation: 'DashboardPage'
     }
   },
-
+   // ==================== PROYECTOS ====================
+  {
+    path: 'projects',
+    loadChildren: () => 
+      import('./features/projects/projects.routes').then(m => m.PROJECTS_ROUTES),
+    title: 'Proyectos'
+  },
   // ==================== PÁGINA NO ENCONTRADA ====================
   {
     path: '404',
