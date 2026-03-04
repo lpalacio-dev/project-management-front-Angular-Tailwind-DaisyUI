@@ -1,20 +1,22 @@
 // src/app/features/projects/pages/project-detail/project-detail.component.ts
 
 import { Component, inject, signal, computed, OnInit, OnDestroy, viewChild } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectSignalsService } from '@core/signals/project-signals.service';
 import { TaskSignalsService } from '@core/signals/task-signals.service';
+import { MemberSignalsService } from '@core/signals/member-signals.service';
 import { AuthSignalsService } from '@core/signals/auth-signals.service';
-import { ProjectStatusHelper, ProjectStatus } from '@core/models/project.model';
-import { ProjectRoleHelper } from '@core/models/member.model';
-import { DateUtils } from '@core/utils/date.utils';
+import { ProjectStatus } from '@core/models/project.model';
 import { ProjectHeaderComponent } from '../../components/project-header/project-header.component';
 import { ProjectStatsComponent } from '../../components/project-stats/project-stats.component';
 import { ProjectTabsComponent } from '../../components/project-tabs/project-tabs.component';
 import { ProjectEditDialogComponent } from '../../components/project-edit-dialog/project-edit-dialog.component';
+
 /**
- * Página de detalle del proyecto
- * Muestra información completa, tabs de tareas, miembros y actividad
+ * Página de detalle del proyecto.
+ * Orquesta el header, stats, y el sistema de tabs (tareas/miembros/actividad).
+ * Los permisos reales (canEdit, canManageMembers) ahora se derivan
+ * de MemberSignalsService que conoce el rol exacto del usuario en el proyecto.
  */
 @Component({
   selector: 'app-project-detail',
@@ -28,6 +30,7 @@ import { ProjectEditDialogComponent } from '../../components/project-edit-dialog
   ],
   template: `
     <div class="min-h-screen bg-base-200">
+
       @if (projectSignals.loading() && !project()) {
         <!-- Loading skeleton -->
         <div class="container mx-auto px-4 py-8">
@@ -42,6 +45,7 @@ import { ProjectEditDialogComponent } from '../../components/project-edit-dialog
             <div class="h-96 bg-base-300 rounded"></div>
           </div>
         </div>
+
       } @else if (project()) {
         <!-- Header del proyecto -->
         <app-project-header
@@ -70,12 +74,14 @@ import { ProjectEditDialogComponent } from '../../components/project-edit-dialog
           [project]="project()!"
           (saved)="onProjectSaved()"
         />
+
       } @else if (projectSignals.error()) {
         <!-- Error state -->
         <div class="container mx-auto px-4 py-16">
           <div class="alert alert-error">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
               <h3 class="font-bold">Error al cargar proyecto</h3>
@@ -87,90 +93,65 @@ import { ProjectEditDialogComponent } from '../../components/project-edit-dialog
       }
     </div>
   `,
-  styles: [`
-    :host {
-      display: block;
-    }
-  `]
+  styles: [':host { display: block; }']
 })
 export class ProjectDetailComponent implements OnInit, OnDestroy {
-  private readonly route = inject(ActivatedRoute);
+  private readonly route         = inject(ActivatedRoute);
+  private readonly router        = inject(Router);
   protected readonly projectSignals = inject(ProjectSignalsService);
-  protected readonly taskSignals = inject(TaskSignalsService);
-  protected readonly authSignals = inject(AuthSignalsService);
+  protected readonly taskSignals    = inject(TaskSignalsService);
+  protected readonly memberSignals  = inject(MemberSignalsService);
+  protected readonly authSignals    = inject(AuthSignalsService);
 
-  // ViewChild para acceder al dialog
   private readonly editDialog = viewChild(ProjectEditDialogComponent);
 
-  // Project ID desde la ruta
   protected readonly projectId = signal<string>('');
+  protected readonly project   = computed(() => this.projectSignals.selectedProject());
 
-  // Computed
-  protected readonly project = computed(() => this.projectSignals.selectedProject());
-  
   /**
-   * Verifica si el usuario puede editar el proyecto
-   * Solo Owner o Admin global
+   * canEditProject: se deriva del rol real en el proyecto (MemberSignalsService).
+   * Fallback a ownerId si los miembros aún no cargaron.
    */
   protected readonly canEditProject = computed(() => {
+    // Si ya tenemos rol real del miembro, usarlo
+    if (this.memberSignals.members().length > 0) {
+      return this.memberSignals.canEditProject();
+    }
+    // Fallback: comparar ownerId mientras cargan los miembros
     const proj = this.project();
-    const currentUserId = this.authSignals.userId();
-    const isAdmin = this.authSignals.isAdmin();
-    
-    if (!proj || !currentUserId) return false;
-    
-    return proj.ownerId === currentUserId || isAdmin;
+    return proj?.ownerId === this.authSignals.userId() || this.authSignals.isAdmin();
   });
 
-  /**
-   * Verifica si puede gestionar miembros
-   * Owner, Admin del proyecto, o Admin global
-   */
   protected readonly canManageMembers = computed(() => {
+    if (this.memberSignals.members().length > 0) {
+      return this.memberSignals.canManageMembers();
+    }
     const proj = this.project();
-    const currentUserId = this.authSignals.userId();
-    const isAdmin = this.authSignals.isAdmin();
-    
-    if (!proj || !currentUserId) return false;
-    
-    // Por ahora asumimos que el Owner puede gestionar
-    // TODO: Consultar rol real del usuario en el proyecto desde MemberService
-    return proj.ownerId === currentUserId || isAdmin;
+    return proj?.ownerId === this.authSignals.userId() || this.authSignals.isAdmin();
   });
 
-  /**
-   * Verifica si puede abandonar el proyecto
-   * No Owner (Admin/Member pueden abandonar)
-   */
   protected readonly canLeaveProject = computed(() => {
+    if (this.memberSignals.members().length > 0) {
+      return this.memberSignals.canLeaveProject();
+    }
     const proj = this.project();
-    const currentUserId = this.authSignals.userId();
-    
-    if (!proj || !currentUserId) return false;
-    
-    // Owner no puede abandonar
-    return proj.ownerId !== currentUserId;
+    return proj?.ownerId !== this.authSignals.userId();
   });
 
+  // ── Lifecycle ──────────────────────────────────────────────
   ngOnInit(): void {
-    // Obtener ID del proyecto de la ruta
     const id = this.route.snapshot.params['id'];
     this.projectId.set(id);
-
-    // Cargar proyecto
     this.loadProject(id);
   }
 
   ngOnDestroy(): void {
-    // Limpiar estado al salir
-    console.log('Destruyendo componente')
     this.projectSignals.clearSelected();
     this.taskSignals.clear();
+    this.memberSignals.clear();
   }
 
-  /**
-   * Carga el proyecto
-   */
+  // ── Loaders ───────────────────────────────────────────────
   private async loadProject(id: string): Promise<void> {
     try {
       await this.projectSignals.loadProject(id);
@@ -179,24 +160,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Editar proyecto
-   */
+  // ── Handlers ──────────────────────────────────────────────
   protected onEditProject(): void {
     this.editDialog()?.openDialog();
   }
 
-  /**
-   * Maneja el guardado del proyecto
-   */
   protected onProjectSaved(): void {
-    // El proyecto ya se actualizó en el signal service
-    // No necesitamos recargar, los signals se actualizan automáticamente
+    // El signal service ya actualizó el estado — nada más que hacer
   }
 
-  /**
-   * Eliminar proyecto
-   */
   protected async onDeleteProject(): Promise<void> {
     const proj = this.project();
     if (!proj) return;
@@ -207,30 +179,32 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
     try {
       await this.projectSignals.deleteProject(proj.id);
-      // La navegación se hace automáticamente en el service
+      // deleteProject navega a /projects automáticamente
     } catch (error) {
       console.error('Error deleting project:', error);
     }
   }
 
   /**
-   * Abandonar proyecto
+   * Abandonar proyecto: ahora delegado a MemberSignalsService.
+   * Navega a /projects si tiene éxito.
    */
   protected async onLeaveProject(): Promise<void> {
     const proj = this.project();
     if (!proj) return;
 
-    if (!confirm(`¿Estás seguro de abandonar el proyecto "${proj.name}"?\n\nPerderás acceso a todas las tareas y datos del proyecto.`)) {
+    if (!confirm(`¿Estás seguro de abandonar "${proj.name}"?\n\nPerderás acceso a todas las tareas y datos del proyecto.`)) {
       return;
     }
 
-    // TODO: Implementar con MemberService
-    console.log('Leave project');
+    try {
+      await this.memberSignals.leaveProject(proj.id);
+      this.router.navigate(['/projects']);
+    } catch (error) {
+      console.error('Error leaving project:', error);
+    }
   }
 
-  /**
-   * Cambiar estado del proyecto
-   */
   protected async onStatusChange(newStatus: ProjectStatus): Promise<void> {
     const proj = this.project();
     if (!proj) return;

@@ -29,7 +29,7 @@ export enum ProjectRole {
  * Coincide con AddProjectMemberDto del backend
  */
 export interface AddMemberRequest {
-  userId: string;
+  userIdentifier: string;
   role: ProjectRole;
 }
 
