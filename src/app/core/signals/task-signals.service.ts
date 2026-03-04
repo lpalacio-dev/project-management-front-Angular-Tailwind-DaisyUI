@@ -1,129 +1,90 @@
 // src/app/core/signals/task-signals.service.ts
 
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { TaskService } from '../services/task.service';
-import { NotificationService } from '../services/notification.service';
-import { AuthSignalsService } from './auth-signals.service';
-import { 
-  Task, 
-  CreateTaskRequest, 
+import { TaskService } from '@core/services/task.service';
+import { NotificationService } from '@core/services/notification.service';
+import { AuthSignalsService } from '@core/signals/auth-signals.service';
+import { SKIP_LOADING } from '@core/services/user-search.service';
+import {
+  Task,
+  CreateTaskRequest,
   UpdateTaskRequest,
   TaskFilters,
   TaskStatus,
   TaskPriority
-} from '../models/task.model';
+} from '@core/models/task.model';
 
-/**
- * Servicio de state management para tareas usando Signals
- */
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class TaskSignalsService {
-  private readonly taskService = inject(TaskService);
-  private readonly authSignals = inject(AuthSignalsService);
+  private readonly taskService   = inject(TaskService);
+  private readonly authSignals   = inject(AuthSignalsService);
   private readonly notifications = inject(NotificationService);
 
-  // ==================== SIGNALS BASE ====================
-
-  readonly tasks = signal<Task[]>([]);
-  readonly selectedTask = signal<Task | null>(null);
-  readonly loading = signal<boolean>(false);
-  readonly error = signal<string | null>(null);
-  readonly filters = signal<TaskFilters>({});
+  // ── Signals base ─────────────────────────────────────────
+  readonly tasks            = signal<Task[]>([]);
+  readonly selectedTask     = signal<Task | null>(null);
+  readonly loading          = signal<boolean>(false);
+  readonly error            = signal<string | null>(null);
+  readonly filters          = signal<TaskFilters>({});
   readonly currentProjectId = signal<string | null>(null);
 
-  // ==================== COMPUTED SIGNALS ====================
+  // ── Computed ─────────────────────────────────────────────
 
-  /**
-   * Tareas filtradas
-   */
+  readonly taskCount = computed(() => this.tasks().length);
+
   readonly filteredTasks = computed(() => {
-    let filtered = this.tasks();
-    const currentFilters = this.filters();
-    const currentUserId = this.authSignals.userId();
+    let result   = this.tasks();
+    const f      = this.filters();
+    const userId = this.authSignals.userId();
 
-    if (currentFilters.search) {
-      filtered = this.taskService.filterBySearch(filtered, currentFilters.search);
-    }
+    if (f.search)
+      result = this.taskService.filterBySearch(result, f.search);
 
-    if (currentFilters.status && currentFilters.status !== 'all' as any) {
-      filtered = this.taskService.filterByStatus(filtered, currentFilters.status);
-    }
+    if (f.status && (f.status as string) !== 'all')
+      result = this.taskService.filterByStatus(result, f.status);
 
-    if (currentFilters.priority && currentFilters.priority !== 'all' as any) {
-      filtered = this.taskService.filterByPriority(filtered, currentFilters.priority);
-    }
+    if (f.priority && (f.priority as string) !== 'all')
+      result = this.taskService.filterByPriority(result, f.priority);
 
-    if (currentFilters.assignedTo && currentUserId) {
-      filtered = this.taskService.filterByAssignment(
-        filtered, 
-        currentFilters.assignedTo, 
-        currentUserId
-      );
-    }
+    if (f.assignedTo && f.assignedTo !== 'all' && userId)
+      result = this.taskService.filterByAssignment(result, f.assignedTo, userId);
 
-    return filtered;
+    return result;
   });
 
-  /**
-   * Tareas pendientes
-   */
-  readonly pendingTasks = computed(() => 
-    this.tasks().filter(t => t.status === TaskStatus.Pending)
-  );
+  readonly pendingTasks    = computed(() => this.tasks().filter(t => t.status === TaskStatus.Pending));
+  readonly inProgressTasks = computed(() => this.tasks().filter(t => t.status === TaskStatus.InProgress));
+  readonly completedTasks  = computed(() => this.tasks().filter(t => t.status === TaskStatus.Completed));
+  readonly myTasks         = computed(() => {
+    const userId = this.authSignals.userId();
+    return this.tasks().filter(t => t.assignedToId === userId);
+  });
+  readonly unassignedTasks = computed(() => this.tasks().filter(t => !t.assignedToId));
 
-  /**
-   * Tareas en progreso
-   */
-  readonly inProgressTasks = computed(() => 
-    this.tasks().filter(t => t.status === TaskStatus.InProgress)
-  );
+  readonly stats = computed(() => ({
+    total:        this.tasks().length,
+    pending:      this.pendingTasks().length,
+    inProgress:   this.inProgressTasks().length,
+    completed:    this.completedTasks().length,
+    myTasks:      this.myTasks().length,
+    unassigned:   this.unassignedTasks().length,
+    highPriority: this.tasks().filter(t => t.priority === TaskPriority.High).length,
+  }));
 
-  /**
-   * Tareas completadas
-   */
-  readonly completedTasks = computed(() => 
-    this.tasks().filter(t => t.status === TaskStatus.Completed)
-  );
-
-  /**
-   * Mis tareas asignadas
-   */
-  readonly myTasks = computed(() => {
-    const currentUserId = this.authSignals.userId();
-    return this.tasks().filter(t => t.assignedToId === currentUserId);
+  readonly hasActiveFilters = computed(() => {
+    const f = this.filters();
+    return !!(
+      f.search ||
+      (f.status     && (f.status     as string) !== 'all') ||
+      (f.priority   && (f.priority   as string) !== 'all') ||
+      (f.assignedTo && f.assignedTo !== 'all')
+    );
   });
 
-  /**
-   * Tareas sin asignar
-   */
-  readonly unassignedTasks = computed(() => 
-    this.tasks().filter(t => !t.assignedToId)
-  );
+  // ── Métodos públicos ─────────────────────────────────────
 
-  /**
-   * Estadísticas de tareas
-   */
-  readonly stats = computed(() => {
-    const all = this.tasks();
-    return {
-      total: all.length,
-      pending: this.pendingTasks().length,
-      inProgress: this.inProgressTasks().length,
-      completed: this.completedTasks().length,
-      myTasks: this.myTasks().length,
-      unassigned: this.unassignedTasks().length,
-      highPriority: all.filter(t => t.priority === TaskPriority.High).length
-    };
-  });
-
-  // ==================== MÉTODOS PÚBLICOS ====================
-
-  /**
-   * Carga todas las tareas de un proyecto
-   */
   async loadTasks(projectId: string): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -132,18 +93,14 @@ export class TaskSignalsService {
     try {
       const tasks = await firstValueFrom(this.taskService.getAllByProject(projectId));
       this.tasks.set(tasks);
-    } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al cargar tareas';
-      this.error.set(errorMessage);
-      console.error('Error loading tasks:', error);
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Error al cargar tareas';
+      this.error.set(msg);
     } finally {
       this.loading.set(false);
     }
   }
 
-  /**
-   * Carga una tarea específica
-   */
   async loadTask(projectId: string, taskId: string): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -151,153 +108,144 @@ export class TaskSignalsService {
     try {
       const task = await firstValueFrom(this.taskService.getById(projectId, taskId));
       this.selectedTask.set(task);
-      this.updateTaskInList(task);
-    } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al cargar tarea';
-      this.error.set(errorMessage);
-      throw error;
+      this.replaceInList(task);
+    } catch (err: any) {
+      this.error.set(err?.error?.message || 'Error al cargar tarea');
+      throw err;
     } finally {
       this.loading.set(false);
     }
   }
 
-  /**
-   * Crea una nueva tarea
-   */
   async createTask(projectId: string, data: CreateTaskRequest): Promise<Task> {
     this.loading.set(true);
     this.error.set(null);
 
     try {
       const newTask = await firstValueFrom(this.taskService.create(projectId, data));
-      this.tasks.update(tasks => [...tasks, newTask]);
-      this.notifications.success('Tarea creada exitosamente');
+      // Nueva tarea al principio para verla inmediatamente
+      this.tasks.update(tasks => [newTask, ...tasks]);
+      this.notifications.success('Tarea creada');
       return newTask;
-    } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al crear tarea';
-      this.error.set(errorMessage);
-      throw error;
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Error al crear tarea';
+      this.error.set(msg);
+      this.notifications.error(msg);
+      throw err;
     } finally {
       this.loading.set(false);
     }
   }
 
   /**
-   * Actualiza una tarea
+   * FIX: PUT retorna 204 — reconstruimos el objeto localmente con spread.
+   * No dependemos de que el backend devuelva el Task actualizado.
    */
   async updateTask(projectId: string, taskId: string, data: UpdateTaskRequest): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
 
     try {
-      const updatedTask = await firstValueFrom(
-        this.taskService.update(projectId, taskId, data)
-      );
-      
-      this.updateTaskInList(updatedTask);
-      
-      if (this.selectedTask()?.id === taskId) {
-        this.selectedTask.set(updatedTask);
+      await firstValueFrom(this.taskService.update(projectId, taskId, data));
+
+      // Reconstruir localmente: merge del objeto existente + los campos enviados
+      const current = this.tasks().find(t => t.id === taskId);
+      if (current) {
+        const updated: Task = { ...current, ...data };
+        this.replaceInList(updated);
+        if (this.selectedTask()?.id === taskId) this.selectedTask.set(updated);
       }
-      
-      this.notifications.success('Tarea actualizada exitosamente');
-    } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al actualizar tarea';
-      this.error.set(errorMessage);
-      throw error;
+
+      this.notifications.success('Tarea actualizada');
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Error al actualizar tarea';
+      this.error.set(msg);
+      this.notifications.error(msg);
+      throw err;
     } finally {
       this.loading.set(false);
     }
   }
 
-  /**
-   * Elimina una tarea
-   */
   async deleteTask(projectId: string, taskId: string): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
 
     try {
       await firstValueFrom(this.taskService.delete(projectId, taskId));
-      
       this.tasks.update(tasks => tasks.filter(t => t.id !== taskId));
-      
-      if (this.selectedTask()?.id === taskId) {
-        this.selectedTask.set(null);
-      }
-      
-      this.notifications.success('Tarea eliminada exitosamente');
-    } catch (error: any) {
-      const errorMessage = error?.error?.message || 'Error al eliminar tarea';
-      this.error.set(errorMessage);
-      throw error;
+      if (this.selectedTask()?.id === taskId) this.selectedTask.set(null);
+      this.notifications.success('Tarea eliminada');
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Error al eliminar tarea';
+      this.error.set(msg);
+      this.notifications.error(msg);
+      throw err;
     } finally {
       this.loading.set(false);
     }
   }
 
   /**
-   * Toggle rápido de completado
+   * FIX: Optimistic update — actualiza la UI inmediatamente sin esperar el servidor.
+   * Usa SKIP_LOADING para no activar la barra top (acción inline silenciosa).
+   * Revierte el cambio local si el servidor falla.
    */
   async toggleCompleted(task: Task): Promise<void> {
     const projectId = this.currentProjectId();
     if (!projectId) return;
 
-    this.loading.set(true);
+    const newStatus = task.status === TaskStatus.Completed
+      ? TaskStatus.Pending
+      : TaskStatus.Completed;
+
+    // 1. Actualizar UI inmediatamente — sin loading, sin barra top
+    const optimistic: Task = { ...task, status: newStatus };
+    this.replaceInList(optimistic);
+
+    const data: UpdateTaskRequest = {
+      title:        task.title,
+      description:  task.description,
+      priority:     task.priority,
+      status:       newStatus,
+      dueDate:      task.dueDate,
+      assignedToId: task.assignedToId,
+    };
 
     try {
-      const updatedTask = await firstValueFrom(
-        this.taskService.toggleCompleted(projectId, task)
+      // 2. Persistir en background — silencioso
+      await firstValueFrom(
+        this.taskService.update(
+          projectId,
+          task.id,
+          data,
+          new HttpContext().set(SKIP_LOADING, true)
+        )
       );
-      
-      this.updateTaskInList(updatedTask);
-      
-      const action = updatedTask.status === TaskStatus.Completed ? 'completada' : 'marcada como pendiente';
-      this.notifications.success(`Tarea ${action}`);
-    } catch (error: any) {
+    } catch {
+      // 3. Revertir si falla — restaurar el estado original
+      this.replaceInList(task);
       this.notifications.error('Error al actualizar tarea');
-      throw error;
-    } finally {
-      this.loading.set(false);
     }
   }
 
-  /**
-   * Actualiza los filtros
-   */
-  setFilters(filters: TaskFilters): void {
-    this.filters.set(filters);
+  setFilters(filters: Partial<TaskFilters>): void {
+    this.filters.update(current => ({ ...current, ...filters }));
   }
 
-  /**
-   * Limpia los filtros
-   */
-  clearFilters(): void {
-    this.filters.set({});
-  }
+  clearFilters(): void { this.filters.set({}); }
+  clearSelected(): void { this.selectedTask.set(null); }
 
-  /**
-   * Limpia la tarea seleccionada
-   */
-  clearSelected(): void {
-    this.selectedTask.set(null);
-  }
-
-  /**
-   * Limpia todas las tareas
-   */
   clear(): void {
     this.tasks.set([]);
     this.selectedTask.set(null);
     this.filters.set({});
     this.currentProjectId.set(null);
+    this.error.set(null);
   }
 
-  // ==================== MÉTODOS PRIVADOS ====================
-
-  private updateTaskInList(task: Task): void {
-    this.tasks.update(tasks => 
-      tasks.map(t => t.id === task.id ? task : t)
-    );
+  // ── Privados ─────────────────────────────────────────────
+  private replaceInList(task: Task): void {
+    this.tasks.update(tasks => tasks.map(t => t.id === task.id ? task : t));
   }
 }
