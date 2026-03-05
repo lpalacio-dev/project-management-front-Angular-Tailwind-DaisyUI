@@ -1,98 +1,126 @@
-// src/app/features/dashboard/pages/dashboard/dashboard.component.ts
+// src/app/features/dashboard/dashboard.component.ts
 
-import { Component, inject } from '@angular/core';
-import { AuthSignalsService } from '../../core/signals/auth-signals.service';
+import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthSignalsService } from '@core/signals/auth-signals.service';
+import { ProjectSignalsService } from '@core/signals/project-signals.service';
+import { TaskSignalsService } from '@core/signals/task-signals.service';
 
 /**
- * Dashboard principal (Placeholder)
- * Página inicial después de login
+ * Dashboard principal.
+ * El fondo y min-h-screen ya los provee MainLayoutComponent — no repetirlos aquí.
  */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
   template: `
-    <div class="min-h-screen bg-base-200 p-8">
-      <!-- Header -->
+    <div class="max-w-5xl mx-auto px-4 py-8 lg:px-8">
+
+      <!-- Bienvenida -->
       <div class="mb-8">
-        <h1 class="text-4xl font-bold text-base-content mb-2">
+        <h1 class="text-3xl font-bold text-base-content">
           ¡Bienvenido, {{ authSignals.username() }}!
         </h1>
-        <p class="text-base-content/70">
-          Este es tu dashboard de gestión de proyectos
+        <p class="text-base-content/60 mt-1">
+          Aquí tienes un resumen de tu actividad
         </p>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <!-- Card 1 -->
-        <div class="card bg-base-100 shadow-lg">
-          <div class="card-body">
-            <h2 class="card-title text-primary">Proyectos</h2>
-            <p class="text-3xl font-bold">0</p>
-            <p class="text-sm text-base-content/70">Total de proyectos</p>
+      <!-- Stats cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+
+        <div class="card bg-base-100 shadow-sm border border-base-200">
+          <div class="card-body py-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-base-content/50 font-medium">Proyectos</p>
+                <p class="text-3xl font-bold text-primary mt-1">—</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Card 2 -->
-        <div class="card bg-base-100 shadow-lg">
-          <div class="card-body">
-            <h2 class="card-title text-secondary">Tareas</h2>
-            <p class="text-3xl font-bold">0</p>
-            <p class="text-sm text-base-content/70">Tareas pendientes</p>
+        <div class="card bg-base-100 shadow-sm border border-base-200">
+          <div class="card-body py-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-base-content/50 font-medium">Tareas pendientes</p>
+                <p class="text-3xl font-bold text-warning mt-1">—</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
+                <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Card 3 -->
-        <div class="card bg-base-100 shadow-lg">
-          <div class="card-body">
-            <h2 class="card-title text-accent">Colaboradores</h2>
-            <p class="text-3xl font-bold">0</p>
-            <p class="text-sm text-base-content/70">Miembros activos</p>
+        <div class="card bg-base-100 shadow-sm border border-base-200">
+          <div class="card-body py-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-base-content/50 font-medium">Colaboradores</p>
+                <p class="text-3xl font-bold text-accent mt-1">—</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
+                <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="card bg-base-100 shadow-lg">
+      <!-- Acciones rápidas -->
+      <div class="card bg-base-100 shadow-sm border border-base-200 mb-6">
         <div class="card-body">
-          <h2 class="card-title mb-4">Acciones Rápidas</h2>
-          
-          <div class="flex flex-wrap gap-4">
-            <a routerLink="/projects/create" class="btn btn-primary">
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <h2 class="card-title text-base mb-4">Acciones rápidas</h2>
+          <div class="flex flex-wrap gap-3">
+            <a routerLink="/projects/create" class="btn btn-primary btn-sm gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
-              Nuevo Proyecto
+              Nuevo proyecto
             </a>
-
-            <a routerLink="/projects" class="btn btn-outline">
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            <a routerLink="/projects" class="btn btn-outline btn-sm gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              Ver Proyectos
+              Ver proyectos
             </a>
-
-            <a routerLink="/users/me" class="btn btn-outline">
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <a routerLink="/users/me" class="btn btn-outline btn-sm gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              Mi Perfil
+              Mi perfil
             </a>
           </div>
         </div>
       </div>
 
-      <!-- User Info -->
-      <div class="mt-8 card bg-base-100 shadow-lg">
+      <!-- Info usuario (debug — quitar en producción) -->
+      <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body">
-          <h2 class="card-title">Información de Usuario</h2>
-          <div class="space-y-2 text-sm">
-            <p><strong>Usuario:</strong> {{ authSignals.username() }}</p>
-            <p><strong>ID:</strong> {{ authSignals.userId() }}</p>
-            <p><strong>Roles:</strong> {{ authSignals.userRoles().join(', ') }}</p>
-            <p><strong>Es Admin:</strong> {{ authSignals.isAdmin() ? 'Sí' : 'No' }}</p>
+          <h2 class="card-title text-base mb-3">Información de sesión</h2>
+          <div class="space-y-1.5 text-sm text-base-content/70">
+            <p><span class="font-medium text-base-content">Usuario:</span> {{ authSignals.username() }}</p>
+            <p><span class="font-medium text-base-content">ID:</span> {{ authSignals.userId() }}</p>
+            <p><span class="font-medium text-base-content">Roles:</span> {{ authSignals.userRoles().join(', ') }}</p>
+            <p><span class="font-medium text-base-content">Admin:</span> {{ authSignals.isAdmin() ? 'Sí' : 'No' }}</p>
           </div>
         </div>
       </div>
