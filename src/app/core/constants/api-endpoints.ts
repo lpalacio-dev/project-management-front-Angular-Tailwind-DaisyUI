@@ -26,11 +26,28 @@ export const API_ENDPOINTS = {
   PROJECTS: {
     BASE: `${API_BASE_URL}/api/projects`,
     BY_ID: (id: string) => `${API_BASE_URL}/api/projects/${id}`,
-    TASKS: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/tasks`,
-    TASK_BY_ID: (projectId: string, taskId: string) => 
+    CREATE: `${API_BASE_URL}/api/projects`,
+    UPDATE: (id: string) => `${API_BASE_URL}/api/projects/${id}`,
+    DELETE: (id: string) => `${API_BASE_URL}/api/projects/${id}`
+  },
+  TASKS: {
+    BY_PROJECT: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/tasks`,
+    BY_ID: (projectId: string, taskId: string) => 
       `${API_BASE_URL}/api/projects/${projectId}/tasks/${taskId}`,
-    MEMBERS: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/members`,
-    MEMBER_BY_ID: (projectId: string, userId: string) => 
+    CREATE: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/tasks`,
+    UPDATE: (projectId: string, taskId: string) => 
+      `${API_BASE_URL}/api/projects/${projectId}/tasks/${taskId}`,
+    DELETE: (projectId: string, taskId: string) => 
+      `${API_BASE_URL}/api/projects/${projectId}/tasks/${taskId}`
+  },
+  MEMBERS: {
+    BY_PROJECT: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/members`,
+    BY_USER: (projectId: string, userId: string) => 
+      `${API_BASE_URL}/api/projects/${projectId}/members/${userId}`,
+    ADD: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/members`,
+    UPDATE_ROLE: (projectId: string, userId: string) => 
+      `${API_BASE_URL}/api/projects/${projectId}/members/${userId}`,
+    REMOVE: (projectId: string, userId: string) => 
       `${API_BASE_URL}/api/projects/${projectId}/members/${userId}`,
     LEAVE: (projectId: string) => `${API_BASE_URL}/api/projects/${projectId}/members/leave`
   },
@@ -39,12 +56,17 @@ export const API_ENDPOINTS = {
    * Endpoints de usuarios
    */
   USERS: {
-    BASE: `${API_BASE_URL}/api/users`,
     SEARCH: `${API_BASE_URL}/api/users/search`,
     ME: `${API_BASE_URL}/api/users/me`,
+    UPDATE_PROFILE: `${API_BASE_URL}/api/users/me`,
     CHANGE_PASSWORD: `${API_BASE_URL}/api/users/me/change-password`,
+    UPLOAD_PROFILE_IMAGE: `${API_BASE_URL}/api/users/me/profile-image`,
+    DELETE_PROFILE_IMAGE: `${API_BASE_URL}/api/users/me/profile-image`,
+    // Admin endpoints
+    ALL: `${API_BASE_URL}/api/users`,
     BY_ID: (id: string) => `${API_BASE_URL}/api/users/${id}`,
-    ROLES: (id: string) => `${API_BASE_URL}/api/users/${id}/roles`
+    MANAGE_ROLES: (id: string) => `${API_BASE_URL}/api/users/${id}/roles`,
+    DELETE: (id: string) => `${API_BASE_URL}/api/users/${id}`
   }
 } as const;
 

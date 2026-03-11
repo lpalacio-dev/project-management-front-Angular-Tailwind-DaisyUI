@@ -3,7 +3,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AuthSignalsService } from '../../../../core/signals/auth.signal.service';
+import { AuthSignalsService } from '../../../../core/signals/auth-signals.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { 
   passwordMatchValidator, 

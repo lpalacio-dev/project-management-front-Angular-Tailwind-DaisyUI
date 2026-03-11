@@ -5,17 +5,14 @@ on:
     branches:
       - develop
       - prod
-  workflow_dispatch: # Permite ejecución manual desde la web
+  workflow_dispatch: 
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
-    # Definimos variables dinámicas según la rama (como hacías en GitLab)
-    env:
-      S3_BUCKET: gestion-proyectos-front
-      DISTRIBUTION_ID: E2VNLYAE99DGIU
-      DEPLOY_AMBIENTE: ${{ github.ref_name == 'prod' && 'build' || 'build' }}
+    # 1. Mapeamos la rama al entorno de GitHub
+    environment: ${{ github.ref_name == 'prod' && 'production' || 'development' }}
 
     steps:
       - name: Checkout código
@@ -31,19 +28,19 @@ jobs:
         run: npm install
 
       - name: Build
-        run: npm run ${{ env.DEPLOY_AMBIENTE }}
+        run: npm run build
 
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # Los secrets también se toman del environment automáticamente
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
       - name: Deploy a S3 e Invalidation
-        # El if asegura que 'prod' solo se ejecute manualmente si así lo deseas, 
-        # o puedes quitarlo para que sea automático como en develop.
+        # Mantenemos tu lógica de ejecución, pero usamos las variables del entorno
         if: github.ref_name == 'develop' || (github.ref_name == 'prod' && github.event_name != 'push')
         run: |
-          aws s3 sync dist/project-management-front/browser/ s3://${{ env.S3_BUCKET }}/ --delete
-          aws cloudfront create-invalidation --distribution-id ${{ env.DISTRIBUTION_ID }} --paths "/*"
+          aws s3 sync dist/project-management-front/browser/ s3://${{ vars.S3_BUCKET }}/ --delete
+          aws cloudfront create-invalidation --distribution-id ${{ vars.DISTRIBUTION_ID }} --paths "/*"

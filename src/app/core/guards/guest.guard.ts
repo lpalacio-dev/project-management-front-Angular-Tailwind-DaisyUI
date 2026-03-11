@@ -2,7 +2,7 @@
 
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthSignalsService } from '../signals/auth.signal.service';
+import { AuthSignalsService } from '../signals/auth-signals.service';
 
 /**
  * Guard de invitado (Functional)

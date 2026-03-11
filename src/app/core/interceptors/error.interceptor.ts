@@ -4,7 +4,7 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { AuthSignalsService } from '../signals/auth.signal.service';
+import { AuthSignalsService } from '../signals/auth-signals.service';
 import { NotificationService } from '../services/notification.service';
 import { ApiErrorHelper } from '../models/api-response.model';
 
