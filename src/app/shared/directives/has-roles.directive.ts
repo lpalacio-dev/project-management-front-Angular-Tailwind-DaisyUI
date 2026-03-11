@@ -1,7 +1,7 @@
 // src/app/shared/directives/has-role.directive.ts
 
 import { Directive, Input, TemplateRef, ViewContainerRef, inject, effect } from '@angular/core';
-import { AuthSignalsService } from '../../core/signals/auth.signal.service';
+import { AuthSignalsService } from '../../core/signals/auth-signals.service';
 
 /**
  * Directiva estructural para mostrar/ocultar elementos según roles
