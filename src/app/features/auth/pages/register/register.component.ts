@@ -122,6 +122,7 @@ import {
                     class="input input-bordered w-full pr-12"
                     [class.input-error]="isFieldInvalid('password')"
                     autocomplete="new-password"
+                    (input)="passwordValue.set($any($event.target).value)"
                   />
                   <button
                     type="button"
@@ -297,27 +298,30 @@ export class RegisterComponent implements OnInit {
   // Signal para mostrar/ocultar password
   protected readonly showPassword = signal(false);
 
-  // FormGroup del registro
-  protected registerForm!: FormGroup;
+  /**
+   * FIX: computed() no rastrea form.value — FormGroup no es un signal.
+   * Signal propio actualizado desde el template con (input).
+   */
+  protected readonly passwordValue = signal('');
 
-  // Computed signals para indicador de fortaleza
-  protected readonly passwordStrength = computed(() => {
-    const password = this.registerForm?.get('password')?.value || '';
-    return getPasswordStrength(password);
-  });
+  protected readonly passwordStrength = computed(() =>
+    getPasswordStrength(this.passwordValue())
+  );
 
-  protected readonly passwordStrengthText = computed(() => {
-    return getPasswordStrengthText(this.passwordStrength());
-  });
+  protected readonly passwordStrengthText = computed(() =>
+    getPasswordStrengthText(this.passwordStrength())
+  );
 
   protected readonly passwordStrengthValue = computed(() => {
-    const strength = this.passwordStrength();
-    switch (strength) {
-      case 'weak': return 33;
+    switch (this.passwordStrength()) {
+      case 'weak':   return 33;
       case 'medium': return 66;
       case 'strong': return 100;
     }
   });
+
+  // FormGroup del registro
+  protected registerForm!: FormGroup;
 
   ngOnInit(): void {
     this.initForm();
@@ -344,9 +348,6 @@ export class RegisterComponent implements OnInit {
       ]],
       confirmPassword: ['', [
         Validators.required
-      ]],
-      acceptTerms: [false, [
-        Validators.requiredTrue
       ]]
     }, {
       validators: passwordMatchValidator('password', 'confirmPassword')
