@@ -1,5 +1,5 @@
 
 
 export const environment = {
-    API_BASE_URL: 'https://localhost:32771'
+    API_BASE_URL: 'https://localhost:32769'
 };

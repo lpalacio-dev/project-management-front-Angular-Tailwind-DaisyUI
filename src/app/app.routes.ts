@@ -70,6 +70,15 @@ export const routes: Routes = [
             .then(m => m.UserProfileComponent),
         title: 'Mi Perfil'
       },
+       // ── Módulo de IA ──────────────────────────────────
+      // Ruta: /ai/generate
+      // Escalable: futuras rutas (chat, risks…) se añaden en ai.routes.ts
+      {
+        path: 'ai',
+        loadChildren: () =>
+          import('./features/ai/ai.routes').then(m => m.AI_ROUTES),
+        title: 'Generar con IA'
+      },
 
     ]
   },
